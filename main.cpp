@@ -38,7 +38,7 @@ int main()
 
     AntSettings aSetts =
     {
-	64,
+	12800,
 	{sf::Color(255, 255, 255)},
 	16,
 	16,
@@ -122,9 +122,9 @@ int main()
 	switch(currState)
 	{	
 	    case GameState::Play:
-	        region.tick(ticksPassed);
-		ant.tick(ticksPassed);
-		region.draw(window);
+	        shr_region->tick(ticksPassed);
+	        ant.tick(ticksPassed);
+		shr_region->draw(window);
 		ant.draw(window);
 		break;
 	}

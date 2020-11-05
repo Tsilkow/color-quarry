@@ -136,7 +136,7 @@ void Region::update()
 {
     for(int i = 0; i < m_toUpdate.size(); ++i)
     {
-	int index = (m_toUpdate[i].y * m_rSetts->dimensions.x + m_toUpdate[i].x) * 4;
+	int index = (m_toUpdate[i].x * m_rSetts->dimensions.y + m_toUpdate[i].y) * 4;
 	int type = atCoords(m_data, m_toUpdate[i]).type;
 	std::vector<sf::Vector2f> texCoords = {
 	    {(float) type    * m_rSetts->tileSize, 0.f},
@@ -191,8 +191,9 @@ std::vector<int> Region::digOut(sf::Vector2i coords, int amount)
 
 	if(atCoords(m_data, coords).r + atCoords(m_data, coords).g + atCoords(m_data, coords).b == 0)
 	{
+	    //printVector(coords, true);
 	    atCoords(m_data, coords).type = TileType::open;
-	    m_toUpdate.emplace_back(coords);
+	    m_toUpdate.push_back(coords);
 	}
     }
 

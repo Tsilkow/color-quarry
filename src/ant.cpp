@@ -11,9 +11,12 @@ Ant::Ant(std::shared_ptr<AntSettings>& aSetts, std::shared_ptr<Region>& world,
     m_type(type),
     m_coords(coords),
     m_direction(0),
-    m_storage(3, 0)
+    m_storage(3, 0),
+    m_currAction(ActionType::wait),
+    m_actionProgress(0)
 {
     m_storageLeft = m_aSetts->capacity;
+    m_mask.push_back(m_coords);
     
     switch(m_type)
     {
@@ -24,7 +27,8 @@ Ant::Ant(std::shared_ptr<AntSettings>& aSetts, std::shared_ptr<Region>& world,
     m_representation.setOrigin(size * 0.5f);
     m_representation.setColor(m_aSetts->allColors[m_allegiance]);
     m_representation.setScale(sf::Vector2f(1.f, 1.f) * (float)m_aSetts->tileSize / size.x);
-    m_representation.setPosition(sf::Vector2f(coords * m_aSetts->tileSize));
+    m_position = (sf::Vector2f(m_coords) + sf::Vector2f(0.5f, 0.5f)) * (float)m_aSetts->tileSize;
+    m_representation.setPosition(m_position);
 }
 
 bool Ant::attack()
@@ -36,13 +40,15 @@ bool Ant::move()
 {
     ++m_actionProgress;
 
-    m_representation.setPosition(
-	   (float)m_aSetts->tileSize * (sf::Vector2f(m_coords + g_moves[m_direction]) *
-					std::round((float)m_actionProgress/m_aSetts->walkingSpeed)));
+    m_representation.setPosition(m_position +
+				 sf::Vector2f(g_moves[m_direction] *
+					      (int)std::round((float)m_aSetts->tileSize * 
+							      m_actionProgress / m_aSetts->walkingSpeed)));
     
     if(m_actionProgress >= m_aSetts->walkingSpeed)
     {
 	m_coords += g_moves[m_direction];
+	m_position = (sf::Vector2f(m_coords) + sf::Vector2f(0.5f, 0.5f)) * (float)m_aSetts->tileSize;
 	m_mask.clear();
 	m_mask.emplace_back(m_coords);
 	
@@ -60,9 +66,9 @@ bool Ant::dig()
 
     if(m_actionProgress % 5 == 0)
     {
-	m_representation.setPosition(sf::Vector2f(m_coords * m_aSetts->tileSize + g_moves[m_direction]));
+	m_representation.setPosition(m_position + sf::Vector2f(g_moves[m_direction]));
     }
-    else m_representation.setPosition(sf::Vector2f(m_coords * m_aSetts->tileSize));
+    else m_representation.setPosition(m_position);
     
     if(m_actionProgress >= m_aSetts->diggingSpeed)
     {
@@ -106,15 +112,15 @@ bool Ant::moveTo(sf::Vector2i target, bool dig)
 
     while(potenPaths.size() > 0)
     {
-	auto curr = potenPaths.back();
-	potenPaths.pop_back();
+	auto curr = potenPaths[0];
+	potenPaths.erase(potenPaths.begin());
 
 	for(int i = 0; i < g_moves.size(); ++i)
 	{
 	    sf::Vector2i next = std::get<1>(curr) + g_moves[i];
 	    
-	    if(next == target || ((m_world->isWalkable(next) || (dig && m_world->isDiggable(next))) &&
-				  visited.find(next) == visited.end()))
+	    if(next == target || (visited.find(next) == visited.end() &&
+				  (m_world->isWalkable(next) || (dig && m_world->isDiggable(next)))))
 	    {
 		std::vector<int> temp = std::get<0>(curr);
 		temp.emplace_back(i);
@@ -151,6 +157,10 @@ bool Ant::moveTo(sf::Vector2i target, bool dig)
 		m_plan.push_back({ActionType::dig, result[i]});
 	    }
 	    m_plan.push_back({ActionType::move, result[i]});
+	    
+	    curr += g_moves[result[i]];
+
+	    printVector(curr, true);
 	}
     }
     return stop;
@@ -165,6 +175,7 @@ bool Ant::tick(int ticksPassed)
 	    m_currAction = m_plan.back().type;
 	    m_direction = m_plan.back().direction;
 	    m_representation.setRotation(m_direction * 90.f);
+	    m_plan.pop_back();
 	}
 	else m_currAction = wait;
     }

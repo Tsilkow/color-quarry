@@ -43,6 +43,7 @@ class Ant
     sf::Vector2i m_coords;
     std::vector<sf::Vector2i> m_mask;
     int m_direction;
+    sf::Vector2f m_position;
     sf::Sprite m_representation;
 
     int m_storageLeft;
