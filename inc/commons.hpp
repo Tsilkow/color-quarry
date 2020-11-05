@@ -38,3 +38,5 @@ std::vector<sf::Color> generatePalette(int colorTotal);
 void printVector(sf::Vector2i a, bool enter);
 
 void printVector(sf::Vector2f a, bool enter);
+
+sf::Vector2f alongSquare(float point);

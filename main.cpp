@@ -13,6 +13,7 @@
 #include "commons.hpp"
 #include "resources.hpp"
 #include "region.hpp"
+#include "ant.hpp"
 
 
 using namespace std;
@@ -27,14 +28,28 @@ int main()
 	16,                   // tileSize
 	16,                   // texTileSize
 	128,                  // colorPerTile
+	4,                    // nestTotal
 	100,                  // genCenTotal
-	{1, 3, 7}             // colorGenWghts
+	{1, 3, 7},            // colorGenWghts
+	{1, 0, 1},            // walkable
+	{0, 1, 0}             // diggable
     };
-
     shared_ptr<RegionSettings> shr_rSetts = make_shared<RegionSettings>(rSetts);
+
+    AntSettings aSetts =
+    {
+	64,
+	{sf::Color(255, 255, 255)},
+	16,
+	16,
+	64
+    };
+    shared_ptr<AntSettings> shr_aSetts = make_shared<AntSettings>(aSetts);
 
     ResourceHolder<sf::Texture, std::string> textures;
     textures.load("tileset", "data/tileset.png");
+    textures.load("worker", "data/worker.png");
+    textures.load("soldier", "data/soldier.png");
 
     sf::RenderWindow window(sf::VideoMode(850, 800), "Color Quarry");
     window.setFramerateLimit(60);
@@ -43,6 +58,10 @@ int main()
     window.setView(actionView);
 
     Region region(shr_rSetts, textures);
+    shared_ptr<Region> shr_region = make_shared<Region>(region);
+
+    Ant ant(shr_aSetts, shr_region, textures, "auntie", 0, AntType::worker, sf::Vector2i(13, 13));
+    ant.moveTo(sf::Vector2i(37, 37), true);
 
     enum GameState{Menu, Play, Scores};
     GameState currState = GameState::Play;
@@ -104,7 +123,9 @@ int main()
 	{	
 	    case GameState::Play:
 	        region.tick(ticksPassed);
+		ant.tick(ticksPassed);
 		region.draw(window);
+		ant.draw(window);
 		break;
 	}
 

@@ -19,13 +19,18 @@ struct RegionSettings
     int tileSize;
     int texTileSize;
     int colorPerTile;
+    int nestTotal;
     int genCenTotal; // generation centers total
     std::vector<int> colorGenWghts; // color generation weights: r = 0, g = 1, b = 2
+    std::vector<int> walkable;
+    std::vector<int> diggable;
 };
+
+enum TileType {open=0, wall=1, nest=2};
 
 struct Tile
 {
-    int type; // 0 - empty, 1 - stone, 2 - nest
+    TileType type;
     int r;
     int g;
     int b;
@@ -56,8 +61,19 @@ class Region
 
     public:
     Region(std::shared_ptr<RegionSettings>& rSetts, ResourceHolder<sf::Texture, std::string>& textures);
+
+    std::vector<int> digOut(sf::Vector2i coords, int amount);
     
     bool tick(int ticksPassed);
 
     void draw(sf::RenderTarget& target);
+
+
+    const Tile& getTile(sf::Vector2i coords) {return atCoords(m_data, coords); }
+    
+    bool inBounds(sf::Vector2i coords);
+    
+    bool isWalkable(sf::Vector2i coords);
+
+    bool isDiggable(sf::Vector2i coords);
 };

@@ -18,7 +18,7 @@ int modulo(int a, int b)
 float modulo(float a, float b)
 {
     while(a <  0) a += b;
-    while(a >= b) a -=b;
+    while(a >= b) a -= b;
 
     return a;
 }
@@ -146,4 +146,50 @@ void printVector(sf::Vector2f a, bool enter)
 {
     std::cout << "{" << a.x << ", " << a.y << "}";
     if(enter) std::cout << std::endl;
+}
+
+sf::Vector2f squareTurn(float point)
+{
+    if(point != 1.f) point = modulo(point, 1.f);
+    std::cout << point;
+    
+    if(point <= 1.f/2.f) return sf::Vector2f(point * 2.f, -1.f);
+    else return sf::Vector2f(1.f, -2.f * (1.f - point));
+}
+
+sf::Vector2f alongSquare(float point)
+{
+    sf::Vector2f result;
+    std::cout << std::setw(10) << point << " = ";
+    
+    if     (point < 0.25f)
+    {
+	std::cout << "1 (";
+	result = squareTurn(4.f * point);
+    }
+    else if(point < 0.5f )
+    {
+	std::cout << "2 (";
+	point -= 0.25f;
+	result = squareTurn(1.f - 4.f * point);
+	result.y = -result.y;
+    }
+    else if(point < 0.75f )
+    {
+	std::cout << "3 (";
+	point -= 0.5f;
+	result = squareTurn(4.f * point);
+	result = -result;
+    }
+    else
+    {
+	std::cout << "4 (";
+	point -= 0.75f;
+	result = squareTurn(1.f - 4.f * point);
+	result.x = -result.x;
+    }
+    
+    std::cout << ") ";
+
+    return result;
 }
