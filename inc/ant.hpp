@@ -49,6 +49,7 @@ class Ant
     int m_direction;
     sf::Vector2f m_position;
     sf::Sprite m_representation;
+    std::vector<sf::Vertex> m_pathRepres;
 
     int m_storageLeft;
     std::vector<int> m_storage;

@@ -8,7 +8,7 @@ Simulation::Simulation(std::shared_ptr<RegionSettings>& rSetts, std::shared_ptr<
     m_region(std::make_shared<Region>(rSetts, textures))
 {
     m_ants.emplace_back(m_aSetts, m_region, textures, "auntie", 0, AntType::worker, sf::Vector2i(12, 25));
-    m_ants.back().moveTo(sf::Vector2i(12, 20), true);
+    m_ants.back().moveTo(sf::Vector2i(25, 10), true);
 }
 
 bool Simulation::tick()

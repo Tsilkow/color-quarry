@@ -55,10 +55,9 @@ bool Ant::move()
 {
     ++m_actionProgress;
 
-    m_representation.setPosition(m_position +
-				 sf::Vector2f(getMove(m_direction) *
-					      (int)std::round((float)m_aSetts->tileSize * 
-							      m_actionProgress / m_aSetts->walkingSpeed)));
+    m_position = m_position + sf::Vector2f(getMove(m_direction) *
+					   (int)std::round((float)m_aSetts->tileSize / m_aSetts->walkingSpeed));
+    m_representation.setPosition(m_position);
     
     if(m_actionProgress >= m_aSetts->walkingSpeed)
     {
@@ -115,6 +114,12 @@ std::vector<int> Ant::unload()
     return result;
 }
 
+bool costComparator(const std::tuple<std::vector<int>, sf::Vector2i, int>& a,
+		    const std::tuple<std::vector<int>, sf::Vector2i, int>& b)
+{
+    return std::get<2>(a) < std::get<2>(b);
+}
+
 std::pair<std::vector<int>, int> Ant::pathTo(sf::Vector2i target, bool dig)
 {
     std::vector<int> result;
@@ -128,6 +133,13 @@ std::pair<std::vector<int>, int> Ant::pathTo(sf::Vector2i target, bool dig)
 
     while(potenPaths.size() > 0)
     {
+	for(int i = 0; i < potenPaths.size(); ++i)
+	{
+	    printVector(std::get<1>(potenPaths[i]), false);
+	    std::cout << std::get<2>(potenPaths[i]) << "\n";
+	}
+	std::cout << "\n\n\n";
+	
 	auto curr = potenPaths[0];
 	potenPaths.erase(potenPaths.begin());
 
@@ -135,8 +147,8 @@ std::pair<std::vector<int>, int> Ant::pathTo(sf::Vector2i target, bool dig)
 	{
 	    sf::Vector2i next = std::get<1>(curr) + getMove(i);
 	    
-	    if(next == target || (visited.find(next) == visited.end() &&
-				  (m_world->isWalkable(next) || (dig && m_world->isDiggable(next)))))
+	    if(visited.find(next) == visited.end() &&
+	       (m_world->isWalkable(next) || (dig && m_world->isDiggable(next))))
 	    {
 		std::vector<int> temp = std::get<0>(curr);
 		temp.emplace_back(i);
@@ -161,6 +173,7 @@ std::pair<std::vector<int>, int> Ant::pathTo(sf::Vector2i target, bool dig)
 	    if(stop) break;
 	}
 	if(stop) break;
+	else sort(potenPaths.begin(), potenPaths.end(), costComparator);
     }
 
     printVector(m_coords, true);
@@ -224,7 +237,7 @@ bool Ant::tick()
 	
 	if(m_path.size() > 0)
 	{
-	    if(m_world->isDiggable(m_coords + getMove(m_path.back())) && m_storageLeft == 0)
+	    if(m_world->isDiggable(m_coords + getMove(m_path[0])) && m_storageLeft == 0)
 	    {
 		std::cout << nests.size() << std::endl;
 		std::pair<std::vector<int>, int> bestPath; 
@@ -253,6 +266,7 @@ bool Ant::tick()
 		}
 		else
 		{
+		    std::cout << "path to base\n";
 		    m_path = bestPath.first;
 		}
 	    
@@ -260,12 +274,25 @@ bool Ant::tick()
 	}
 
 	if(m_path.size() > 0)
-	{
-	    m_direction = m_path.back();
-	    m_path.pop_back();
+	{    
+	    m_pathRepres.clear();
+	    sf::Vector2i temp = m_coords;
+	    m_pathRepres.emplace_back(m_position, sf::Color::White);
+	    for(int i = 0; i < m_path.size(); ++i)
+	    {
+		temp += getMove(m_path[i]);
+		m_pathRepres.emplace_back((sf::Vector2f(temp) + sf::Vector2f(0.5f, 0.5f)) *
+					  (float)m_aSetts->tileSize, sf::Color::White);
+	    }
+	    
+	    m_direction = m_path[0];
 	    m_representation.setRotation(m_direction * 90.f);
 
-	    if     (m_world->isWalkable(m_coords + getMove(m_direction))) m_currAction = ActionType::move;
+	    if     (m_world->isWalkable(m_coords + getMove(m_direction)))
+	    {
+		m_currAction = ActionType::move;
+		m_path.erase(m_path.begin());
+	    }
 	    else if(m_world->isDiggable(m_coords + getMove(m_direction))) m_currAction = ActionType::dig;
 	    else
 	    {
@@ -279,6 +306,8 @@ bool Ant::tick()
 	    m_path.clear();
 	}
     }
+    
+    m_pathRepres[0].position = m_position;
     
     switch(m_currAction)
     {
@@ -294,4 +323,5 @@ bool Ant::tick()
 void Ant::draw(sf::RenderTarget& target)
 {
     target.draw(m_representation);
+    target.draw(&m_pathRepres[0], m_pathRepres.size(), sf::LineStrip);
 }
