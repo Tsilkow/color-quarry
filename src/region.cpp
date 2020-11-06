@@ -119,16 +119,19 @@ void Region::generate()
     }
     
     // nest generation
+    m_nests = std::vector< std::vector<sf::Vector2i> >(m_rSetts->nestTotal, std::vector<sf::Vector2i>());
     for(int i = 0; i < m_rSetts->nestTotal; ++i)
     {
 	sf::Vector2f temp = alongSquare((float)i / m_rSetts->nestTotal);
+	sf::Vector2i nestCoords = sf::Vector2i(m_rSetts->dimensions.x/2.f + temp.x *
+					       m_rSetts->dimensions.x/4.f,
+					       m_rSetts->dimensions.x/2.f + temp.y *
+					       m_rSetts->dimensions.y/4.f);
 
 	printVector(temp, true);
 	
-	atCoords(m_data, sf::Vector2i(m_rSetts->dimensions.x/2.f + temp.x *
-				      m_rSetts->dimensions.x/4.f,
-				      m_rSetts->dimensions.x/2.f + temp.y *
-				      m_rSetts->dimensions.y/4.f)).type = TileType::nest;
+	atCoords(m_data, nestCoords).type = TileType::nest;
+	m_nests[0].emplace_back(nestCoords);
     }
 }
 
@@ -200,7 +203,7 @@ std::vector<int> Region::digOut(sf::Vector2i coords, int amount)
     return result;
 }
 
-bool Region::tick(int ticksPassed)
+bool Region::tick()
 {
     update();
 

@@ -1,6 +1,21 @@
 #include "ant.hpp"
 
 
+int getMoveTotal() {return 4; }
+
+sf::Vector2i getMove(int direction)
+{
+    direction = modulo(direction, 4);
+    
+    switch(direction)
+    {
+	case 0: return sf::Vector2i( 0, -1); break;
+	case 1: return sf::Vector2i( 1,  0); break;
+	case 2: return sf::Vector2i( 0,  1); break;
+	case 3: return sf::Vector2i(-1,  0); break;
+    }
+}
+
 Ant::Ant(std::shared_ptr<AntSettings>& aSetts, std::shared_ptr<Region>& world,
 	ResourceHolder<sf::Texture, std::string>& textures, std::string name, int allegiance, AntType type,
 	sf::Vector2i coords):
@@ -41,13 +56,13 @@ bool Ant::move()
     ++m_actionProgress;
 
     m_representation.setPosition(m_position +
-				 sf::Vector2f(g_moves[m_direction] *
+				 sf::Vector2f(getMove(m_direction) *
 					      (int)std::round((float)m_aSetts->tileSize * 
 							      m_actionProgress / m_aSetts->walkingSpeed)));
     
     if(m_actionProgress >= m_aSetts->walkingSpeed)
     {
-	m_coords += g_moves[m_direction];
+	m_coords += getMove(m_direction);
 	m_position = (sf::Vector2f(m_coords) + sf::Vector2f(0.5f, 0.5f)) * (float)m_aSetts->tileSize;
 	m_mask.clear();
 	m_mask.emplace_back(m_coords);
@@ -55,7 +70,7 @@ bool Ant::move()
 	m_actionProgress = 0;
 	return true;
     }
-    else if(m_mask.size() < 2) m_mask.emplace_back(m_coords + g_moves[m_direction]);
+    else if(m_mask.size() < 2) m_mask.emplace_back(m_coords + getMove(m_direction));
     
     return false;
 }
@@ -66,13 +81,13 @@ bool Ant::dig()
 
     if(m_actionProgress % 5 == 0)
     {
-	m_representation.setPosition(m_position + sf::Vector2f(g_moves[m_direction]));
+	m_representation.setPosition(m_position + sf::Vector2f(getMove(m_direction)));
     }
     else m_representation.setPosition(m_position);
     
     if(m_actionProgress >= m_aSetts->diggingSpeed)
     {
-	std::vector<int> load = m_world->digOut(m_coords + g_moves[m_direction], m_storageLeft);
+	std::vector<int> load = m_world->digOut(m_coords + getMove(m_direction), m_storageLeft);
 	int amount = load[0] + load[1] + load[2];
 
 	for(int i = 0; i < 3; ++i)
@@ -100,9 +115,10 @@ std::vector<int> Ant::unload()
     return result;
 }
 
-bool Ant::moveTo(sf::Vector2i target, bool dig)
+std::pair<std::vector<int>, int> Ant::pathTo(sf::Vector2i target, bool dig)
 {
     std::vector<int> result;
+    int score = -1;
     std::vector< std::tuple<std::vector<int>, sf::Vector2i, int> >
 	potenPaths(1, std::make_tuple(std::vector<int>(), m_coords, 0));
     std::set<sf::Vector2i, Vector2iComparator> visited;
@@ -115,9 +131,9 @@ bool Ant::moveTo(sf::Vector2i target, bool dig)
 	auto curr = potenPaths[0];
 	potenPaths.erase(potenPaths.begin());
 
-	for(int i = 0; i < g_moves.size(); ++i)
+	for(int i = 0; i < getMoveTotal(); ++i)
 	{
-	    sf::Vector2i next = std::get<1>(curr) + g_moves[i];
+	    sf::Vector2i next = std::get<1>(curr) + getMove(i);
 	    
 	    if(next == target || (visited.find(next) == visited.end() &&
 				  (m_world->isWalkable(next) || (dig && m_world->isDiggable(next)))))
@@ -128,6 +144,8 @@ bool Ant::moveTo(sf::Vector2i target, bool dig)
 		if(next == target)
 		{
 		    result = temp;
+		    if(dig && m_world->isDiggable(next)) score = std::get<2>(curr) + m_aSetts->diggingSpeed;
+		    else score = std::get<2>(curr) + m_aSetts->walkingSpeed;
 		    stop = true;
 		}
 		else
@@ -145,40 +163,123 @@ bool Ant::moveTo(sf::Vector2i target, bool dig)
 	if(stop) break;
     }
 
-    if(stop)
+    printVector(m_coords, true);
+    std::cout << "{ ";
+    for(int i = 0; i < result.size(); ++i)
     {
-	sf::Vector2i curr = m_coords;
-	m_plan.clear();
-	
-	for(int i = 0; i < result.size(); ++i)
-	{
-	    if(dig && m_world->isDiggable(curr + g_moves[result[i]]))
-	    {
-		m_plan.push_back({ActionType::dig, result[i]});
-	    }
-	    m_plan.push_back({ActionType::move, result[i]});
-	    
-	    curr += g_moves[result[i]];
-
-	    printVector(curr, true);
-	}
+	std::cout << result[i] << " ";
     }
-    return stop;
+    std::cout << "} \n";
+    printVector(target, true);
+
+    return std::make_pair(result, score);
 }
 
-bool Ant::tick(int ticksPassed)
+bool Ant::moveTo(sf::Vector2i target, bool dig)
 {
+    m_destination = target;
+    std::vector<int> temp = pathTo(target, dig).first;
+
+    if(temp.size() > 0)
+    {
+	m_path = temp;
+	return true;
+    }
+    return false;
+}
+
+bool Ant::tick()
+{
+    /*
+    std::cout << "{ ";
+    for(int i = 0; i < m_path.size(); ++i)
+    {
+	std::cout << m_path[i] << " ";
+    }
+    std::cout << "} \n";
+    */
+    
+    std::vector<sf::Vector2i> nests = m_world->getNests(m_allegiance);
+    for(int i = 0; i < nests.size(); ++i)
+    {
+	if(m_coords == nests[i])
+	{
+	    unload();
+	    break;
+	}
+    }
+    
     if(m_actionProgress == 0)
     {
-	if(m_plan.size() > 0)
+	if(m_path.size() == 0)
 	{
-	    m_currAction = m_plan.back().type;
-	    m_direction = m_plan.back().direction;
-	    m_representation.setRotation(m_direction * 90.f);
-	    m_plan.pop_back();
+	    if(m_destination != m_coords)
+	    {
+		if(!moveTo(m_destination, true))
+		{
+		    m_destination = m_coords;
+		}
+	    }
 	}
-	else m_currAction = wait;
+	
+	if(m_path.size() > 0)
+	{
+	    if(m_world->isDiggable(m_coords + getMove(m_path.back())) && m_storageLeft == 0)
+	    {
+		std::cout << nests.size() << std::endl;
+		std::pair<std::vector<int>, int> bestPath; 
+		std::pair<std::vector<int>, int> currPath;
+	    
+		if(nests.size() != 0)
+		{
+		    bestPath = pathTo(nests[0], false);
+	    
+		    for(int i = 1; i < nests.size(); ++i)
+		    {
+			currPath = pathTo(nests[i], false);
+		    
+			if(currPath.second != -1) // if path exists
+			{
+			    if(bestPath.second == -1 || bestPath.second > currPath.second) bestPath = currPath;
+			}
+		    }
+		}
+
+		if(nests.size() == 0 || bestPath.second == -1)
+		{
+		    m_currAction = ActionType::wait;
+		    m_destination = m_coords;
+		    m_path.clear();
+		}
+		else
+		{
+		    m_path = bestPath.first;
+		}
+	    
+	    }
+	}
+
+	if(m_path.size() > 0)
+	{
+	    m_direction = m_path.back();
+	    m_path.pop_back();
+	    m_representation.setRotation(m_direction * 90.f);
+
+	    if     (m_world->isWalkable(m_coords + getMove(m_direction))) m_currAction = ActionType::move;
+	    else if(m_world->isDiggable(m_coords + getMove(m_direction))) m_currAction = ActionType::dig;
+	    else
+	    {
+		m_currAction = ActionType::wait;
+		m_path.clear();
+	    }
+	}
+	else
+	{
+	    m_currAction = ActionType::wait;
+	    m_path.clear();
+	}
     }
+    
     switch(m_currAction)
     {
 	case ActionType::attack: attack(); break;

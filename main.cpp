@@ -14,6 +14,7 @@
 #include "resources.hpp"
 #include "region.hpp"
 #include "ant.hpp"
+#include "simulation.hpp"
 
 
 using namespace std;
@@ -38,7 +39,7 @@ int main()
 
     AntSettings aSetts =
     {
-	12800,
+	128,
 	{sf::Color(255, 255, 255)},
 	16,
 	16,
@@ -57,11 +58,7 @@ int main()
     sf::View actionView(sf::Vector2f(425.f, 400.f), sf::Vector2f(850, 800));
     window.setView(actionView);
 
-    Region region(shr_rSetts, textures);
-    shared_ptr<Region> shr_region = make_shared<Region>(region);
-
-    Ant ant(shr_aSetts, shr_region, textures, "auntie", 0, AntType::worker, sf::Vector2i(13, 13));
-    ant.moveTo(sf::Vector2i(37, 37), true);
+    Simulation simulation(shr_rSetts, shr_aSetts, textures);
 
     enum GameState{Menu, Play, Scores};
     GameState currState = GameState::Play;
@@ -122,10 +119,8 @@ int main()
 	switch(currState)
 	{	
 	    case GameState::Play:
-	        shr_region->tick(ticksPassed);
-	        ant.tick(ticksPassed);
-		shr_region->draw(window);
-		ant.draw(window);
+		simulation.tick();
+		simulation.draw(window);
 		break;
 	}
 

@@ -1,3 +1,5 @@
+#pragma once
+
 #include <iostream>
 #include <vector>
 #include <memory>
@@ -20,7 +22,9 @@ struct AntSettings
     int diggingSpeed;
 };
 
-std::vector<sf::Vector2i> g_moves = {{0, -1}, {1, 0}, {0, 1}, {-1, 0}};
+int getMoveTotal();
+
+sf::Vector2i getMove(int direction);
 
 enum ActionType {wait, move, dig, attack};
 
@@ -51,7 +55,8 @@ class Ant
     ActionType m_currAction;
     int m_actionProgress;
 
-    std::vector<Action> m_plan;
+    std::vector<int> m_path;
+    sf::Vector2i m_destination;
 
     bool attack();
     
@@ -60,15 +65,19 @@ class Ant
     bool dig();
 
     std::vector<int> unload();
+
+    // returns best path (and its score) to target, if it doesn't exist, returns empty
+    std::pair<std::vector<int>, int> pathTo(sf::Vector2i target, bool dig);
     
     public:
     Ant(std::shared_ptr<AntSettings>& aSetts, std::shared_ptr<Region>& world,
 	ResourceHolder<sf::Texture, std::string>& textures, std::string name, int allegiance, AntType type,
 	sf::Vector2i coords);
 
-    bool moveTo(sf::Vector2i target, bool dig=false);
-
-    bool tick(int ticksPassed);
+    // sets non-empty result of pathTo to current ant path
+    bool moveTo(sf::Vector2i target, bool dig);
+    
+    bool tick();
 
     void draw(sf::RenderTarget& target);
 

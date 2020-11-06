@@ -46,6 +46,7 @@ class Region
     private:
     std::shared_ptr<RegionSettings> m_rSetts;
     std::vector< std::vector<Tile> > m_data;
+    std::vector< std::vector<sf::Vector2i> > m_nests;
     std::vector<sf::Vertex> m_representation;
     sf::RenderStates m_states;
 
@@ -64,12 +65,14 @@ class Region
 
     std::vector<int> digOut(sf::Vector2i coords, int amount);
     
-    bool tick(int ticksPassed);
+    bool tick();
 
     void draw(sf::RenderTarget& target);
 
 
     const Tile& getTile(sf::Vector2i coords) {return atCoords(m_data, coords); }
+
+    const std::vector<sf::Vector2i>& getNests(int allegiance) {return m_nests[allegiance]; }
     
     bool inBounds(sf::Vector2i coords);
     
