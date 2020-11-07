@@ -8,6 +8,61 @@ bool Vector2iComparator::operator()(const sf::Vector2i& a, const sf::Vector2i& b
     return false;
 }
 
+std::vector<int> spreadEvenly(int toGet, int r, int g, int b)
+{
+    std::vector<int> result(3, 0);
+
+    if(r == g && r == b && r == 0)
+    {
+	r = 1;
+	g = 1;
+	b = 1;
+    }
+    
+    int total = r + g + b;
+    result[0] = toGet * r/total;
+    result[1] = toGet * g/total;
+    result[2] = toGet * b/total;
+
+    r -= result[0];
+    g -= result[1];
+    b -= result[2];
+    toGet -= result[0] + result[1] + result[2];
+
+    while(toGet > 0)
+    {
+	if(r > g)
+	{
+	    if(r > b)
+	    {
+		++result[0];
+		--r;
+	    }
+	    else
+	    {
+		++result[2];
+		++b;
+	    }
+	}
+	else
+	{
+	    if(g > b)
+	    {
+		++result[1];
+		--g;
+	    }
+	    else
+	    {
+		++result[2];
+		++b;
+	    }
+	}
+	--toGet;
+    }
+
+    return result;
+}
+
 Region::Region(std::shared_ptr<RegionSettings>& rSetts,
 	       ResourceHolder<sf::Texture, std::string>& textures):
     m_rSetts(rSetts)
@@ -74,7 +129,7 @@ void Region::generate()
 {
     m_data = std::vector< std::vector<Tile> >(m_rSetts->dimensions.x,
 					      std::vector<Tile>(m_rSetts->dimensions.y,
-								{TileType::wall, 0, 0, 0}));
+								{TileType::wall, 1, 1, 1}));
     std::map<sf::Vector2i, int, Vector2iComparator> genCenters;
 
     // stone centers generation
@@ -91,7 +146,7 @@ void Region::generate()
     }
 
     // stone generation
-    for(int x = 0; x < m_rSetts->dimensions.x; ++x)
+    /*for(int x = 0; x < m_rSetts->dimensions.x; ++x)
     {
 	for(int y = 0; y < m_rSetts->dimensions.y; ++y)
 	{
@@ -115,6 +170,63 @@ void Region::generate()
 		case 1: atCoords(m_data, sf::Vector2i(x, y)).g = m_rSetts->colorPerTile; break;
 		case 2: atCoords(m_data, sf::Vector2i(x, y)).b = m_rSetts->colorPerTile; break;
 	    }
+	}
+    }*/
+
+    // marking generation centers' reaches
+    for(auto it = genCenters.begin(); it != genCenters.end(); ++it)
+    {
+	sf::Vector2i coords(it->first);
+	for(int r = 0; r < m_rSetts->genCenReach; ++r)
+	{
+	    if(r == 0)
+	    {
+		if(inBounds(coords))
+		{
+		    switch(it->second)
+		    {
+			case 0: atCoords(m_data, coords).r += m_rSetts->genCenReach-r; break;
+			case 1: atCoords(m_data, coords).g += m_rSetts->genCenReach-r; break;
+			case 2: atCoords(m_data, coords).b += m_rSetts->genCenReach-r; break;
+		    }
+		}
+	    }
+	    else
+	    {
+		for(int i = 0; i < 4; ++i)
+		{
+		    for(int j = 0; j < r; ++j)
+		    {
+			if(inBounds(coords))
+			{   
+			    switch(it->second)
+			    {
+				case 0: atCoords(m_data, coords).r += m_rSetts->genCenReach-r; break;
+				case 1: atCoords(m_data, coords).g += m_rSetts->genCenReach-r; break;
+				case 2: atCoords(m_data, coords).b += m_rSetts->genCenReach-r; break;
+			    }
+			}
+			coords += getMove(i+1) + getMove(i+2);
+		    }
+		}
+	    }
+	    coords += getMove(0);
+	}
+    }
+
+    // processing generation centers weights
+    for(int x = 0; x < m_rSetts->dimensions.x; ++x)
+    {
+	for(int y = 0; y < m_rSetts->dimensions.y; ++y)
+	{
+	    std::vector<int> temp = spreadEvenly(m_rSetts->colorPerTile,
+						 m_data[x][y].r, m_data[x][y].g, m_data[x][y].b);
+	    
+	    m_data[x][y].r = temp[0];
+	    m_data[x][y].g = temp[1];
+	    m_data[x][y].b = temp[2];
+
+	    std::cout << "(" << m_data[x][y].r << " " << m_data[x][y].g << " " << m_data[x][y].b << ")\n";
 	}
     }
     

@@ -15,6 +15,10 @@ T& atCoords(std::vector< std::vector<T> >& data, sf::Vector2i coords)
     return data[coords.x][coords.y];
 }
 
+int getMoveTotal();
+
+sf::Vector2i getMove(int direction);
+
 int modulo(int a, int b);
 
 float modulo(float a, float b);

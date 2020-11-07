@@ -30,8 +30,9 @@ int main()
 	16,                   // texTileSize
 	128,                  // colorPerTile
 	4,                    // nestTotal
-	100,                  // genCenTotal
-	{1, 3, 7},            // colorGenWghts
+	1000,                  // genCenTotal
+	10,                   // genCenReach
+	{3, 3, 3},            // colorGenWghts
 	{1, 0, 1},            // walkable
 	{0, 1, 0}             // diggable
     };

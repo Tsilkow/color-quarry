@@ -21,6 +21,7 @@ struct RegionSettings
     int colorPerTile;
     int nestTotal;
     int genCenTotal; // generation centers total
+    int genCenReach; // generation center reach
     std::vector<int> colorGenWghts; // color generation weights: r = 0, g = 1, b = 2
     std::vector<int> walkable;
     std::vector<int> diggable;

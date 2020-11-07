@@ -7,6 +7,21 @@
 #include <math.h>
 
 
+int getMoveTotal() {return 4; }
+
+sf::Vector2i getMove(int direction)
+{
+    direction = modulo(direction, 4);
+    
+    switch(direction)
+    {
+	case 0: return sf::Vector2i( 0, -1); break;
+	case 1: return sf::Vector2i( 1,  0); break;
+	case 2: return sf::Vector2i( 0,  1); break;
+	case 3: return sf::Vector2i(-1,  0); break;
+    }
+}
+
 int modulo(int a, int b)
 {
     while(a <  0) a += b;

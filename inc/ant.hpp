@@ -22,10 +22,6 @@ struct AntSettings
     int diggingSpeed;
 };
 
-int getMoveTotal();
-
-sf::Vector2i getMove(int direction);
-
 enum ActionType {wait, move, dig, attack};
 
 struct Action

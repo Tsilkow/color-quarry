@@ -1,21 +1,6 @@
 #include "ant.hpp"
 
 
-int getMoveTotal() {return 4; }
-
-sf::Vector2i getMove(int direction)
-{
-    direction = modulo(direction, 4);
-    
-    switch(direction)
-    {
-	case 0: return sf::Vector2i( 0, -1); break;
-	case 1: return sf::Vector2i( 1,  0); break;
-	case 2: return sf::Vector2i( 0,  1); break;
-	case 3: return sf::Vector2i(-1,  0); break;
-    }
-}
-
 Ant::Ant(std::shared_ptr<AntSettings>& aSetts, std::shared_ptr<Region>& world,
 	ResourceHolder<sf::Texture, std::string>& textures, std::string name, int allegiance, AntType type,
 	sf::Vector2i coords):
@@ -125,7 +110,7 @@ std::pair<std::vector<int>, int> Ant::pathTo(sf::Vector2i target, bool dig)
     std::vector<int> result;
     int score = -1;
     std::vector< std::tuple<std::vector<int>, sf::Vector2i, int> >
-	potenPaths(1, std::make_tuple(std::vector<int>(), m_coords, 0));
+	potenPaths(1, std::make_tuple(std::vector<int>(), m_coords, distance(m_coords - target)));
     std::set<sf::Vector2i, Vector2iComparator> visited;
     bool stop = false;
     
@@ -133,15 +118,10 @@ std::pair<std::vector<int>, int> Ant::pathTo(sf::Vector2i target, bool dig)
 
     while(potenPaths.size() > 0)
     {
-	for(int i = 0; i < potenPaths.size(); ++i)
-	{
-	    printVector(std::get<1>(potenPaths[i]), false);
-	    std::cout << std::get<2>(potenPaths[i]) << "\n";
-	}
-	std::cout << "\n\n\n";
-	
 	auto curr = potenPaths[0];
 	potenPaths.erase(potenPaths.begin());
+
+	std::get<2>(curr) -= distance(std::get<1>(curr) - target);
 
 	for(int i = 0; i < getMoveTotal(); ++i)
 	{
@@ -165,9 +145,12 @@ std::pair<std::vector<int>, int> Ant::pathTo(sf::Vector2i target, bool dig)
 		    visited.insert(next);
 		    if(dig && m_world->isDiggable(next))
 		    {
-			potenPaths.emplace_back(temp, next, std::get<2>(curr) + m_aSetts->diggingSpeed);
+			potenPaths.emplace_back(temp, next,
+						std::get<2>(curr) + m_aSetts->diggingSpeed +
+						distance(next - target));
 		    }
-		    else potenPaths.emplace_back(temp, next, std::get<2>(curr) + m_aSetts->walkingSpeed);
+		    else potenPaths.emplace_back(temp, next, std::get<2>(curr) + m_aSetts->walkingSpeed +
+						 distance(next - target));
 		}
 	    }
 	    if(stop) break;
@@ -175,15 +158,6 @@ std::pair<std::vector<int>, int> Ant::pathTo(sf::Vector2i target, bool dig)
 	if(stop) break;
 	else sort(potenPaths.begin(), potenPaths.end(), costComparator);
     }
-
-    printVector(m_coords, true);
-    std::cout << "{ ";
-    for(int i = 0; i < result.size(); ++i)
-    {
-	std::cout << result[i] << " ";
-    }
-    std::cout << "} \n";
-    printVector(target, true);
 
     return std::make_pair(result, score);
 }
