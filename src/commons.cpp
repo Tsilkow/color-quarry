@@ -22,6 +22,11 @@ sf::Vector2i getMove(int direction)
     }
 }
 
+int reverseDirection(int direction)
+{
+    return modulo(direction + 2, 4);
+}
+
 int modulo(int a, int b)
 {
     while(a <  0) a += b;

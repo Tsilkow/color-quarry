@@ -19,6 +19,8 @@ int getMoveTotal();
 
 sf::Vector2i getMove(int direction);
 
+int reverseDirection(int direction);
+
 int modulo(int a, int b);
 
 float modulo(float a, float b);

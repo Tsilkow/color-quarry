@@ -14,7 +14,8 @@ class Simulation
     private:
     std::shared_ptr<RegionSettings> m_rSetts;
     std::shared_ptr<AntSettings> m_aSetts;
-    std::shared_ptr<Region> m_region;
+    Region m_region;
+    std::shared_ptr<Region> m_shr_region;
     std::vector<Ant> m_ants;
     std::vector<Command> m_commands;
 

@@ -99,73 +99,13 @@ std::vector<int> Ant::unload()
     return result;
 }
 
-bool costComparator(const std::tuple<std::vector<int>, sf::Vector2i, int>& a,
-		    const std::tuple<std::vector<int>, sf::Vector2i, int>& b)
-{
-    return std::get<2>(a) < std::get<2>(b);
-}
-
-std::pair<std::vector<int>, int> Ant::pathTo(sf::Vector2i target, bool dig)
-{
-    std::vector<int> result;
-    int score = -1;
-    std::vector< std::tuple<std::vector<int>, sf::Vector2i, int> >
-	potenPaths(1, std::make_tuple(std::vector<int>(), m_coords, distance(m_coords - target)));
-    std::set<sf::Vector2i, Vector2iComparator> visited;
-    bool stop = false;
-    
-    visited.insert(m_coords);
-
-    while(potenPaths.size() > 0)
-    {
-	auto curr = potenPaths[0];
-	potenPaths.erase(potenPaths.begin());
-
-	std::get<2>(curr) -= distance(std::get<1>(curr) - target);
-
-	for(int i = 0; i < getMoveTotal(); ++i)
-	{
-	    sf::Vector2i next = std::get<1>(curr) + getMove(i);
-	    
-	    if(visited.find(next) == visited.end() &&
-	       (m_world->isWalkable(next) || (dig && m_world->isDiggable(next))))
-	    {
-		std::vector<int> temp = std::get<0>(curr);
-		temp.emplace_back(i);
-		
-		if(next == target)
-		{
-		    result = temp;
-		    if(dig && m_world->isDiggable(next)) score = std::get<2>(curr) + m_aSetts->diggingSpeed;
-		    else score = std::get<2>(curr) + m_aSetts->walkingSpeed;
-		    stop = true;
-		}
-		else
-		{
-		    visited.insert(next);
-		    if(dig && m_world->isDiggable(next))
-		    {
-			potenPaths.emplace_back(temp, next,
-						std::get<2>(curr) + m_aSetts->diggingSpeed +
-						distance(next - target));
-		    }
-		    else potenPaths.emplace_back(temp, next, std::get<2>(curr) + m_aSetts->walkingSpeed +
-						 distance(next - target));
-		}
-	    }
-	    if(stop) break;
-	}
-	if(stop) break;
-	else sort(potenPaths.begin(), potenPaths.end(), costComparator);
-    }
-
-    return std::make_pair(result, score);
-}
-
 bool Ant::moveTo(sf::Vector2i target, bool dig)
 {
-    m_destination = target;
-    std::vector<int> temp = pathTo(target, dig).first;
+    int toDig = m_storageLeft;
+    if(dig) toDig = 0;
+
+    std::vector<int> temp = m_world->findPath(m_coords, -1, target, m_aSetts->walkingSpeed,
+					      m_aSetts->diggingSpeed, m_storageLeft).first;
 
     if(temp.size() > 0)
     {
@@ -186,70 +126,46 @@ bool Ant::tick()
     std::cout << "} \n";
     */
     
-    std::vector<sf::Vector2i> nests = m_world->getNests(m_allegiance);
-    for(int i = 0; i < nests.size(); ++i)
+    sf::Vector2i nest = m_world->getDomainAt(m_allegiance, m_coords);
+
+    // if ant is in a nest, unload
+    if(m_coords == nest)
     {
-	if(m_coords == nests[i])
-	{
-	    unload();
-	    break;
-	}
+	unload();
     }
-    
+
+    // if action is finished
     if(m_actionProgress == 0)
     {
-	if(m_path.size() == 0)
+	// if you have no path, find one to destination; if you can't, your destination is now here
+	if(m_path.size() == 0 && m_destination != m_coords)
 	{
-	    if(m_destination != m_coords)
+	    if(!moveTo(m_destination, true))
 	    {
-		if(!moveTo(m_destination, true))
-		{
-		    m_destination = m_coords;
-		}
+		m_destination = m_coords;
 	    }
 	}
-	
+
+	// if you have to dig, but you have no storage, look for a way to the closest nest
 	if(m_path.size() > 0)
 	{
 	    if(m_world->isDiggable(m_coords + getMove(m_path[0])) && m_storageLeft == 0)
 	    {
-		std::cout << nests.size() << std::endl;
-		std::pair<std::vector<int>, int> bestPath; 
-		std::pair<std::vector<int>, int> currPath;
-	    
-		if(nests.size() != 0)
-		{
-		    bestPath = pathTo(nests[0], false);
-	    
-		    for(int i = 1; i < nests.size(); ++i)
-		    {
-			currPath = pathTo(nests[i], false);
-		    
-			if(currPath.second != -1) // if path exists
-			{
-			    if(bestPath.second == -1 || bestPath.second > currPath.second) bestPath = currPath;
-			}
-		    }
-		}
-
-		if(nests.size() == 0 || bestPath.second == -1)
+		// TODO: compare heurestic to all alligned nests
+		if(nest == sf::Vector2i(-1, -1) || !moveTo(nest, false))
 		{
 		    m_currAction = ActionType::wait;
 		    m_destination = m_coords;
 		    m_path.clear();
 		}
-		else
-		{
-		    std::cout << "path to base\n";
-		    m_path = bestPath.first;
-		}
-	    
 	    }
 	}
 
+	// path processing
 	if(m_path.size() > 0)
 	{    
 	    m_pathRepres.clear();
+	    // drawing path
 	    sf::Vector2i temp = m_coords;
 	    m_pathRepres.emplace_back(m_position, sf::Color::White);
 	    for(int i = 0; i < m_path.size(); ++i)
@@ -262,22 +178,22 @@ bool Ant::tick()
 	    m_direction = m_path[0];
 	    m_representation.setRotation(m_direction * 90.f);
 
+	    // choose action based on next tile 
 	    if     (m_world->isWalkable(m_coords + getMove(m_direction)))
 	    {
 		m_currAction = ActionType::move;
 		m_path.erase(m_path.begin());
 	    }
 	    else if(m_world->isDiggable(m_coords + getMove(m_direction))) m_currAction = ActionType::dig;
-	    else
+	    else // if you can't, discard the path (attempt to find a new way will be in the next tick)
 	    {
 		m_currAction = ActionType::wait;
 		m_path.clear();
 	    }
 	}
-	else
+	else // if no path
 	{
 	    m_currAction = ActionType::wait;
-	    m_path.clear();
 	}
     }
     

@@ -62,16 +62,12 @@ class Ant
     bool dig();
 
     std::vector<int> unload();
-
-    // returns best path (and its score) to target, if it doesn't exist, returns empty
-    std::pair<std::vector<int>, int> pathTo(sf::Vector2i target, bool dig);
     
     public:
     Ant(std::shared_ptr<AntSettings>& aSetts, std::shared_ptr<Region>& world,
 	ResourceHolder<sf::Texture, std::string>& textures, std::string name, int allegiance, AntType type,
 	sf::Vector2i coords);
 
-    // sets non-empty result of pathTo to current ant path
     bool moveTo(sf::Vector2i target, bool dig);
     
     bool tick();

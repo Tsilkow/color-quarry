@@ -8,6 +8,19 @@ bool Vector2iComparator::operator()(const sf::Vector2i& a, const sf::Vector2i& b
     return false;
 }
 
+bool ReservationComparator::operator()(const Reservation& a, const Reservation& b)
+{
+    if(a.x == b.x)
+    {
+	if(a.y == b.y)
+	{
+	    return (a.from < b.from);
+	}
+	else return (a.y < b.y);
+    }
+    else return (a.x < b.x);
+}
+
 std::vector<int> spreadEvenly(int toGet, int r, int g, int b)
 {
     std::vector<int> result(3, 0);
@@ -65,7 +78,8 @@ std::vector<int> spreadEvenly(int toGet, int r, int g, int b)
 
 Region::Region(std::shared_ptr<RegionSettings>& rSetts,
 	       ResourceHolder<sf::Texture, std::string>& textures):
-    m_rSetts(rSetts)
+    m_rSetts(rSetts),
+    m_ticks(0)
 {
     m_states.texture = &textures.get("tileset");
     
@@ -232,6 +246,7 @@ void Region::generate()
     
     // nest generation
     m_nests = std::vector< std::vector<sf::Vector2i> >(m_rSetts->nestTotal, std::vector<sf::Vector2i>());
+    m_nestDomains.emplace_back(std::map<sf::Vector2i, int, Vector2iComparator>());
     for(int i = 0; i < m_rSetts->nestTotal; ++i)
     {
 	sf::Vector2f temp = alongSquare((float)i / m_rSetts->nestTotal);
@@ -244,7 +259,21 @@ void Region::generate()
 	
 	atCoords(m_data, nestCoords).type = TileType::nest;
 	m_nests[0].emplace_back(nestCoords);
+	m_nestDomains[0].insert({nestCoords, i});
     }
+
+    // obstacles registration
+    for(int x = 0; x < m_rSetts->dimensions.x; ++x)
+    {
+	for(int y = 0; y < m_rSetts->dimensions.y; ++y)
+	{
+	    if(m_data[x][y].type == TileType::wall)
+	    {
+		m_reservations.insert({{x, y, 0, -1}, m_rSetts->colorPerTile});
+	    }
+	}
+    }
+    
 }
 
 void Region::update()
@@ -268,6 +297,46 @@ void Region::update()
     }
 
     m_toUpdate.clear();
+}
+
+// first is whether it is reserved
+// second is how much digging is needed if it is diggable (-1 means it can't be dug out)
+std::pair<bool, int> Region::isReserved(int x, int y, int from, int to)
+{
+    int toDig = 0;
+    // checking if there are any reservations
+    if(m_reservations.begin() != m_reservations.end())
+    {
+	// first element that is not smaller than time
+	auto it = m_reservations.lower_bound({x, y, from, to});
+
+	// is it overlapping with previous reservation
+	--it;
+	if(it->first.x == x && it->first.y == y && it->first.to >= from)
+	{
+	    if(it->second == 0) return std::make_pair(false, -1);
+	    else toDig = it->second;
+	}
+
+	// is it ovelapping with next reservation
+	++it;
+	if(it->first.x == x && it->first.y == y && it->first.from <= to) std::make_pair(false, -1);
+    }
+    
+    return std::make_pair(true, toDig);
+}
+
+std::pair<bool, int> Region::isReserved(sf::Vector2i coords, int from, int to)
+{
+    return isReserved(coords.x, coords.y, from, to);
+}
+
+void Region::reserve(sf::Vector2i coords, int from, int to)
+{
+    Reservation temp = {coords.x, coords.y, from, to};
+    m_reservations[temp] = 0;
+
+    m_toCleanAt.insert({to, temp});
 }
 
 std::vector<int> Region::digOut(sf::Vector2i coords, int amount)
@@ -309,14 +378,140 @@ std::vector<int> Region::digOut(sf::Vector2i coords, int amount)
 	    //printVector(coords, true);
 	    atCoords(m_data, coords).type = TileType::open;
 	    m_toUpdate.push_back(coords);
+
+	    for(int i = 0; i < getMoveTotal(); ++i)
+	    {
+		sf::Vector2i temp = coords + getMove(i);
+		if(inBounds(temp) && atCoords(m_data, temp).type == TileType::open)
+		{
+		    for(int j = 0; j < m_nestDomains.size(); ++j)
+		    {
+			m_nestDomains[j][coords] = m_nestDomains[j][temp];
+		    }
+		}
+	    }
 	}
     }
 
     return result;
 }
 
-bool Region::tick()
+std::pair<std::vector<int>, int> Region::findPath(sf::Vector2i start, int time, sf::Vector2i target,
+						  int walkingSpeed, int diggingSpeed, int ableToDig)
 {
+    std::vector<int> result;
+    std::vector<std::tuple<sf::Vector2i, int, int>> // coords, time, diggingLeft
+	potenPaths(1, std::make_tuple(start,
+				     time + distance(start - target),
+				     ableToDig));
+    // map storing best direction from these coords to start
+    std::map<sf::Vector2i, int, Vector2iComparator> directions; 
+    bool stop = false;
+
+    if(time == -1) time = m_ticks;
+
+    directions[start] = -1;
+    while(potenPaths.size() > 0)
+    {
+	auto curr = potenPaths[0];
+	potenPaths.erase(potenPaths.begin());
+	
+	// subtract the heurestic from the time
+	std::get<1>(curr) -= distance(std::get<0>(curr) - target);
+
+	// check if these coords are available for walking off of them
+	if(isReserved(std::get<0>(curr), std::get<1>(curr), std::get<1>(curr) + walkingSpeed).first)
+	{
+	    for(int i = 0; i < getMoveTotal(); ++i)
+	    {
+		// coords which it checks
+		sf::Vector2i next = std::get<0>(curr) + getMove(i);
+
+		// is it possible to walk there
+		bool nextWalk = isReserved(next, std::get<1>(curr),
+					   std::get<1>(curr) + walkingSpeed).first;
+		// is it possible to dig there and how much digging there is
+		std::pair<bool, int> nextDig =
+		    isReserved(next, std::get<1>(curr), std::get<1>(curr) + diggingSpeed + walkingSpeed);
+
+		if(directions.find(next) == directions.end() && // checks if coords haven't been visited
+		   (nextWalk || (nextDig.first && nextDig.second <= std::get<2>(curr))))
+		{
+		    // marks which direction it came to these coords
+		    directions[next] = i;
+
+		    // if it has to dig
+		    if(nextDig.first && nextDig.second <= std::get<2>(curr))
+		    {
+			potenPaths.push_back(
+			       std::make_tuple(next, std::get<1>(curr) + walkingSpeed + diggingSpeed,
+					       std::get<2>(curr) - nextDig.second));
+		    }
+		    else // if it can walks here
+		    {
+			potenPaths.push_back(
+			       std::make_tuple(next, std::get<1>(curr) + walkingSpeed, std::get<2>(curr)));
+		    }
+
+		    // if it has arrived, stop search
+		    if(next == target)
+		    {
+			stop = true;
+			break;
+		    }
+		}
+	    }
+	}
+	if(stop) break;
+    }
+
+    // if seach found the destination
+    if(stop)
+    {
+	sf::Vector2i curr = target;
+	// recreate best path found
+	while(curr != start)
+	{
+	    result.push_back(directions[curr]);
+	    curr += getMove(reverseDirection(result.back()));
+	}
+
+	std::reverse(result.begin(), result.end());
+
+	// calculate time and reserve the coords it was traversing
+	for(int i = 0; i < result.size(); ++i)
+	{
+	    // TODO: reserve more! (not reserving the tile you're moving from)
+	    // if walking is possible
+	    if(isReserved(curr, time, time + walkingSpeed).first)
+	    {
+		reserve(curr, time, time + walkingSpeed);
+		time += walkingSpeed;
+	    }
+	    else // otherwise dig (it has to be a legal move, cause it was checked before)
+	    {
+		reserve(curr, time, time + walkingSpeed + diggingSpeed);
+	        time += walkingSpeed + diggingSpeed;
+	    }
+	    curr += getMove(result[i]);
+	}
+    }
+
+    return std::make_pair(result, time);
+}
+
+bool Region::tick(int ticksPassed)
+{
+    m_ticks = ticksPassed;
+
+    auto found = m_toCleanAt.find(m_ticks);
+    while(found != m_toCleanAt.end())
+    {
+	m_reservations.erase(found->second);
+	m_toCleanAt.erase(found);
+	found = m_toCleanAt.find(m_ticks);
+    }
+    
     update();
 
     return false;
@@ -328,6 +523,15 @@ bool Region::inBounds(sf::Vector2i coords)
        coords.y < 0 || coords.y >= m_rSetts->dimensions.y)
 	return false;
     return true;
+}
+
+sf::Vector2i Region::getDomainAt(int allegiance, sf::Vector2i coords)
+{
+    if(m_nestDomains[allegiance].find(coords) != m_nestDomains[allegiance].end())
+    {
+	return m_nests[allegiance][m_nestDomains[allegiance][coords]];
+    }
+    return sf::Vector2i(-1, -1);
 }
 
 bool Region::isWalkable(sf::Vector2i coords)

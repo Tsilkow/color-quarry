@@ -5,16 +5,18 @@ Simulation::Simulation(std::shared_ptr<RegionSettings>& rSetts, std::shared_ptr<
 	       ResourceHolder<sf::Texture, std::string>& textures):
     m_rSetts(rSetts),
     m_aSetts(aSetts),
-    m_region(std::make_shared<Region>(rSetts, textures)),
+    m_region(rSetts, textures),
     m_ticks(0)
 {
-    m_ants.emplace_back(m_aSetts, m_region, textures, "auntie", 0, AntType::worker, sf::Vector2i(12, 25));
+    m_shr_region = std::make_shared<Region>(m_region);
+    
+    m_ants.emplace_back(m_aSetts, m_shr_region, textures, "auntie", 0, AntType::worker, sf::Vector2i(12, 25));
     m_ants.back().moveTo(sf::Vector2i(0, 0), true);
-    m_ants.emplace_back(m_aSetts, m_region, textures, "auntie", 0, AntType::worker, sf::Vector2i(25, 12));
+    m_ants.emplace_back(m_aSetts, m_shr_region, textures, "auntie", 0, AntType::worker, sf::Vector2i(25, 12));
     m_ants.back().moveTo(sf::Vector2i(0, 0), true);
-    m_ants.emplace_back(m_aSetts, m_region, textures, "auntie", 0, AntType::worker, sf::Vector2i(38, 25));
+    m_ants.emplace_back(m_aSetts, m_shr_region, textures, "auntie", 0, AntType::worker, sf::Vector2i(38, 25));
     m_ants.back().moveTo(sf::Vector2i(0, 0), true);
-    m_ants.emplace_back(m_aSetts, m_region, textures, "auntie", 0, AntType::worker, sf::Vector2i(25, 37));
+    m_ants.emplace_back(m_aSetts, m_shr_region, textures, "auntie", 0, AntType::worker, sf::Vector2i(25, 37));
     m_ants.back().moveTo(sf::Vector2i(0, 0), true);
 }
 
@@ -22,7 +24,7 @@ bool Simulation::tick()
 {
     ++m_ticks;
     
-    m_region->tick();
+    m_shr_region->tick(m_ticks);
     for(int i = 0; i < m_ants.size(); ++i)
     {
 	m_ants[i].tick();
@@ -34,7 +36,7 @@ bool Simulation::tick()
 
 void Simulation::draw(sf::RenderTarget& target)
 {
-    m_region->draw(target);
+    m_shr_region->draw(target);
     for(int i = 0; i < m_ants.size(); ++i)
     {
 	m_ants[i].draw(target);
