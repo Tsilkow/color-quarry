@@ -301,9 +301,10 @@ void Region::update()
 
 // first is whether it is reserved
 // second is how much digging is needed if it is diggable (-1 means it can't be dug out)
-std::pair<bool, int> Region::isReserved(int x, int y, int from, int to)
+std::pair<bool, int> Region::isReserved(int x, int y, int from, int duration)
 {
     int toDig = 0;
+    int to = from + duration-1;
     // checking if there are any reservations
     if(m_reservations.begin() != m_reservations.end())
     {
@@ -326,13 +327,14 @@ std::pair<bool, int> Region::isReserved(int x, int y, int from, int to)
     return std::make_pair(false, toDig);
 }
 
-std::pair<bool, int> Region::isReserved(sf::Vector2i coords, int from, int to)
+std::pair<bool, int> Region::isReserved(sf::Vector2i coords, int from, int duration)
 {
-    return isReserved(coords.x, coords.y, from, to);
+    return isReserved(coords.x, coords.y, from, duration);
 }
 
-void Region::reserve(sf::Vector2i coords, int from, int to)
+void Region::reserve(sf::Vector2i coords, int from, int duration)
 {
+    int to = from + duration-1;
     Reservation temp = {coords.x, coords.y, from, to};
     m_reservations[temp] = 0;
 
@@ -429,7 +431,7 @@ bool PathCoordHeuresticComparator::operator() (const PathCoord& a, const PathCoo
 
 int Region::evalByHeurestic(PathCoord path, sf::Vector2i target)
 {
-    return (distance(path.coords() - target) * 16 + path.t);
+    return (distance(path.coords() - target) * 256 + path.t);
 }
 
 std::pair<std::vector<int>, int> Region::findPath(sf::Vector2i start, int time, sf::Vector2i target,
@@ -465,7 +467,7 @@ std::pair<std::vector<int>, int> Region::findPath(sf::Vector2i start, int time, 
 	potenPaths.erase(potenPaths.begin());
 
 	// check if these coords are available for walking off of them
-	if(!isReserved(curr.coords(), curr.t, curr.t + walkingSpeed).first)
+	if(!isReserved(curr.coords(), curr.t, walkingSpeed).first)
 	{
 	    for(int i = 0; i < getMoveTotal()-1; ++i) // consider moves without the waiting one
 	    {
@@ -475,11 +477,14 @@ std::pair<std::vector<int>, int> Region::findPath(sf::Vector2i start, int time, 
 		if(inBounds(next.coords()))
 		{
 		    // is it possible to walk there
-		    bool nextWalk = !isReserved(next.coords(), next.t, next.t + walkingSpeed).first;
+		    bool nextWalk = !isReserved(next.coords(), next.t, walkingSpeed).first;
 		
 		    // is it possible to dig there and how much digging there is
-		    std::pair<bool, int> nextDig = isReserved(next.coords(), next.t,
-							      next.t + diggingSpeed + walkingSpeed);
+		    std::pair<bool, int> nextDig =
+			isReserved(next.coords(), next.t, walkingSpeed + diggingSpeed);
+		    nextDig.first = !nextDig.first;
+		    if(isReserved(curr.coords(), curr.t, walkingSpeed + diggingSpeed).first)
+			nextDig.first = false;
 
 		    if(nextDig.first)
 		    {
@@ -529,15 +534,16 @@ std::pair<std::vector<int>, int> Region::findPath(sf::Vector2i start, int time, 
 		PathCoord next(curr.coords(), curr.t+1, curr.d);
 		next.h = evalByHeurestic(next, target);
 		
-		if(!isReserved(curr.coords(), curr.t, curr.t + 1).first &&
+		if(!isReserved(curr.coords(), curr.t, 1).first &&
 		   directions.find(next) == directions.end())
 		{
-		    directions[next] = std::make_pair(-100, 1);
+		    directions[next] = std::make_pair(4, 1);
 		    potenPaths.insert(next);
 		
 		}
 	    }
 	}
+	else std::cout << "duud, my place is reserved\n";
 	if(stop) break;
     }
 
@@ -550,13 +556,14 @@ std::pair<std::vector<int>, int> Region::findPath(sf::Vector2i start, int time, 
 	// recreate best path found
 	while(curr.coords() != start)
 	{
+	    /*
 	    if(directions.find(curr) == directions.end()) std::cout << "ain't nobody like that here" << std::endl;
 	    else
 	    {
 		std::cout << "( " << directions[curr].first << " | " << directions[curr].second << " )\n";
 	    }
 	    
-	    printVector(curr.toords(), true);
+	    printVector(curr.toords(), true);*/
 	    result.push_back(directions[curr].first);
 	    curr.t -= directions[curr].second;
 	    curr.move(reverseDirection(result.back()));
@@ -568,26 +575,25 @@ std::pair<std::vector<int>, int> Region::findPath(sf::Vector2i start, int time, 
 	// calculate time and reserve the coords it was traversing
 	for(int i = 0; i < result.size(); ++i)
 	{
-	    // TODO: reserve more! (not reserving the tile you're moving from)
 	    // if it's waiting
-	    if(result[i] == -100)
+	    if(result[i] == 4)
 	    {
-		reserve(curr.coords(), time, time+1);
+		reserve(curr.coords(), time, 1);
 		time += 1;
 	    } 
 	    else
 	    {
 		// else if walking is possible
-		if(!isReserved(curr.coords(), time, time + walkingSpeed).first)
+		if(!isReserved(curr.coords(), time, walkingSpeed).first)
 		{
-		    reserve(curr.coords()                     , time, time + walkingSpeed);
-		    reserve(curr.coords() + getMove(result[i]), time, time + walkingSpeed);
+		    reserve(curr.coords()                     , time, walkingSpeed);
+		    reserve(curr.coords() + getMove(result[i]), time, walkingSpeed);
 		    time += walkingSpeed;
 		}
 		else // otherwise dig (it has to be a legal move, cause it was checked before)
 		{
-		    reserve(curr.coords()                     , time, time + walkingSpeed + diggingSpeed);
-		    reserve(curr.coords() + getMove(result[i]), time, time + walkingSpeed + diggingSpeed);
+		    reserve(curr.coords()                     , time, walkingSpeed + diggingSpeed);
+		    reserve(curr.coords() + getMove(result[i]), time, walkingSpeed + diggingSpeed);
 		    time += walkingSpeed + diggingSpeed;
 		}
 		curr.move(result[i]);
