@@ -45,6 +45,55 @@ struct Reservation
     int to;
 };
 
+struct PathCoord
+{
+    int x;
+    int y;
+    int t; // time
+    int d; // diggingLeft
+    int h; // heurestic
+    
+    PathCoord(sf::Vector2i coords, int time, int diggingLeft, int heurestic):
+	x(coords.x), y(coords.y), t(time), d(diggingLeft), h(heurestic)
+	{;}
+    
+    PathCoord(sf::Vector2i coords, int time, int diggingLeft):
+	x(coords.x), y(coords.y), t(time), d(diggingLeft), h(1000000)
+	{;}
+
+    void move(int direction)
+	{
+	    sf::Vector2i difference = getMove(direction);
+	    x += difference.x;
+	    y += difference.y;
+	}
+
+    void print () const
+	{
+	    std::cout << "{ ";
+	    std::cout << "x=" << x << " | ";
+	    std::cout << "y=" << y << " | ";
+	    std::cout << "t=" << t << " | ";
+	    std::cout << "d=" << d << " | ";
+	    std::cout << "h=" << h << " }\n";
+	}
+
+    void setHeurestic(int newHeurestic) {h = newHeurestic; }
+
+    const sf::Vector2i coords() const {return sf::Vector2i(x, y); }
+    const sf::Vector3i toords() const {return sf::Vector3i(x, y, t); }
+};
+
+struct PathCoordComparator
+{
+    bool operator() (const PathCoord& a, const PathCoord& b);
+};
+
+struct PathCoordHeuresticComparator
+{
+    bool operator() (const PathCoord& a, const PathCoord& b);
+};
+
 struct Vector2iComparator
 {
     bool operator()(const sf::Vector2i& a, const sf::Vector2i& b);
@@ -85,6 +134,8 @@ class Region
     std::pair<bool, int> isReserved(sf::Vector2i coords, int from, int to);
 
     void reserve(sf::Vector2i coords, int from, int to);
+    
+    int evalByHeurestic(PathCoord path, sf::Vector2i target);
 
     public:
     Region(std::shared_ptr<RegionSettings>& rSetts, ResourceHolder<sf::Texture, std::string>& textures);
@@ -101,7 +152,7 @@ class Region
 
     const Tile& getTile(sf::Vector2i coords) {return atCoords(m_data, coords); }
 
-    sf::Vector2i getDomainAt(int allegiance, sf::Vector2i coords);
+    sf::Vector2i getNestAt(int allegiance, sf::Vector2i coords);
     
     bool inBounds(sf::Vector2i coords);
     

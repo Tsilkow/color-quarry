@@ -314,16 +314,16 @@ std::pair<bool, int> Region::isReserved(int x, int y, int from, int to)
 	--it;
 	if(it->first.x == x && it->first.y == y && it->first.to >= from)
 	{
-	    if(it->second == 0) return std::make_pair(false, -1);
+	    if(it->second == 0) return std::make_pair(true, -1);
 	    else toDig = it->second;
 	}
 
 	// is it ovelapping with next reservation
 	++it;
-	if(it->first.x == x && it->first.y == y && it->first.from <= to) std::make_pair(false, -1);
+	if(it->first.x == x && it->first.y == y && it->first.from <= to) std::make_pair(true, -1);
     }
     
-    return std::make_pair(true, toDig);
+    return std::make_pair(false, toDig);
 }
 
 std::pair<bool, int> Region::isReserved(sf::Vector2i coords, int from, int to)
@@ -379,10 +379,11 @@ std::vector<int> Region::digOut(sf::Vector2i coords, int amount)
 	    atCoords(m_data, coords).type = TileType::open;
 	    m_toUpdate.push_back(coords);
 
-	    for(int i = 0; i < getMoveTotal(); ++i)
+	    
+	    for(int i = 0; i < getMoveTotal()-1; ++i)
 	    {
 		sf::Vector2i temp = coords + getMove(i);
-		if(inBounds(temp) && atCoords(m_data, temp).type == TileType::open)
+		if(inBounds(temp) && isWalkable(temp))
 		{
 		    for(int j = 0; j < m_nestDomains.size(); ++j)
 		    {
@@ -396,84 +397,170 @@ std::vector<int> Region::digOut(sf::Vector2i coords, int amount)
     return result;
 }
 
+bool PathCoordComparator::operator() (const PathCoord& a, const PathCoord& b)
+{
+    if(a.x == b.x)
+    {
+	if(a.y == b.y)
+	{
+	    return (a.t < b.t);
+		}
+	return (a.y < b.y);
+    }
+    return (a.x < b.x);
+}
+
+bool PathCoordHeuresticComparator::operator() (const PathCoord& a, const PathCoord& b)
+{
+    if(a.h == b.h)
+    {
+	if(a.t == b.t)
+	{
+	    if(a.x == b.x)
+	    {
+		return (a.y < b.y);
+	    }
+	    return (a.x < b.x);
+	}
+	return (a.t < b.t);
+    }
+    return (a.h < b.h);
+};
+
+int Region::evalByHeurestic(PathCoord path, sf::Vector2i target)
+{
+    return (distance(path.coords() - target) * 16 + path.t);
+}
+
 std::pair<std::vector<int>, int> Region::findPath(sf::Vector2i start, int time, sf::Vector2i target,
 						  int walkingSpeed, int diggingSpeed, int ableToDig)
 {
-    std::vector<int> result;
-    std::vector<std::tuple<sf::Vector2i, int, int>> // coords, time, diggingLeft
-	potenPaths(1, std::make_tuple(start,
-				     time + distance(start - target),
-				     ableToDig));
-    // map storing best direction from these coords to start
-    std::map<sf::Vector2i, int, Vector2iComparator> directions; 
-    bool stop = false;
-
     if(time == -1) time = m_ticks;
+    int timeOfArrival;
+    std::vector<int> result;
+    std::set<PathCoord, PathCoordHeuresticComparator> potenPaths;
+    // map storing best direction from these coords to start
+    std::map<PathCoord, std::pair<int, int>, PathCoordComparator> directions; 
+    bool stop = false;
+    PathCoord temp(start, time, ableToDig);
 
-    directions[start] = -1;
+    temp.print();
+
+    temp.h = evalByHeurestic(temp, target);
+    
+    potenPaths.insert(temp);
+    directions[temp] = std::make_pair(-1, 0);
     while(potenPaths.size() > 0)
     {
-	auto curr = potenPaths[0];
-	potenPaths.erase(potenPaths.begin());
+	std::cout << potenPaths.size();/* << " = \n{\n";
+	for(auto it = potenPaths.begin(); it != potenPaths.end(); ++it)
+	{
+	    it->print();
+	    }*/
+	std::cout << "}\n";
+
+	//getchar();
 	
-	// subtract the heurestic from the time
-	std::get<1>(curr) -= distance(std::get<0>(curr) - target);
+	PathCoord curr = *potenPaths.begin();
+	potenPaths.erase(potenPaths.begin());
 
 	// check if these coords are available for walking off of them
-	if(isReserved(std::get<0>(curr), std::get<1>(curr), std::get<1>(curr) + walkingSpeed).first)
+	if(!isReserved(curr.coords(), curr.t, curr.t + walkingSpeed).first)
 	{
-	    for(int i = 0; i < getMoveTotal(); ++i)
+	    for(int i = 0; i < getMoveTotal()-1; ++i) // consider moves without the waiting one
 	    {
 		// coords which it checks
-		sf::Vector2i next = std::get<0>(curr) + getMove(i);
+		PathCoord next(curr.coords() + getMove(i), curr.t, curr.d);
 
-		// is it possible to walk there
-		bool nextWalk = isReserved(next, std::get<1>(curr),
-					   std::get<1>(curr) + walkingSpeed).first;
-		// is it possible to dig there and how much digging there is
-		std::pair<bool, int> nextDig =
-		    isReserved(next, std::get<1>(curr), std::get<1>(curr) + diggingSpeed + walkingSpeed);
-
-		if(directions.find(next) == directions.end() && // checks if coords haven't been visited
-		   (nextWalk || (nextDig.first && nextDig.second <= std::get<2>(curr))))
+		if(inBounds(next.coords()))
 		{
-		    // marks which direction it came to these coords
-		    directions[next] = i;
+		    // is it possible to walk there
+		    bool nextWalk = !isReserved(next.coords(), next.t, next.t + walkingSpeed).first;
+		
+		    // is it possible to dig there and how much digging there is
+		    std::pair<bool, int> nextDig = isReserved(next.coords(), next.t,
+							      next.t + diggingSpeed + walkingSpeed);
 
-		    // if it has to dig
-		    if(nextDig.first && nextDig.second <= std::get<2>(curr))
+		    if(nextDig.first)
 		    {
-			potenPaths.push_back(
-			       std::make_tuple(next, std::get<1>(curr) + walkingSpeed + diggingSpeed,
-					       std::get<2>(curr) - nextDig.second));
+			next.t += walkingSpeed + diggingSpeed;
+			next.d -= nextDig.second;
 		    }
-		    else // if it can walks here
+		    else if(nextWalk)
 		    {
-			potenPaths.push_back(
-			       std::make_tuple(next, std::get<1>(curr) + walkingSpeed, std::get<2>(curr)));
+			next.t += walkingSpeed;
 		    }
+		    // evaluate next using a heurestic
+		    next.h = evalByHeurestic(next, target);
 
-		    // if it has arrived, stop search
-		    if(next == target)
+		    if(directions.find(next) == directions.end() &&
+		       // checks if coords haven't been visited
+		       (nextWalk || (nextDig.first/* && next.d >= 0*/)))
 		    {
-			stop = true;
-			break;
+			// marks which direction it came to these coords
+			std::cout << directions[next].second << std::endl;
+
+			// if it has to dig
+			if(nextDig.first/* && nextDig.second <= next.d*/)
+			{
+			    directions[next] = std::make_pair(i, walkingSpeed + diggingSpeed);
+			    potenPaths.insert(next);
+			}
+			else // if it can walks here
+			{
+			    directions[next] = std::make_pair(i, walkingSpeed);
+			    potenPaths.insert(next);
+			}
+
+			// if it has arrived, stop search
+			if(next.coords() == target)
+			{
+			    stop = true;
+			    timeOfArrival = next.t;
+			    std::cout << i << std::endl;
+			    break;
+			}
 		    }
+		}
+	    }
+	    if(!stop)
+	    {
+		// consider waiting as a move
+		PathCoord next(curr.coords(), curr.t+1, curr.d);
+		next.h = evalByHeurestic(next, target);
+		
+		if(!isReserved(curr.coords(), curr.t, curr.t + 1).first &&
+		   directions.find(next) == directions.end())
+		{
+		    directions[next] = std::make_pair(-100, 1);
+		    potenPaths.insert(next);
+		
 		}
 	    }
 	}
 	if(stop) break;
     }
 
+    //getchar();
+
     // if seach found the destination
     if(stop)
     {
-	sf::Vector2i curr = target;
+	PathCoord curr(target, timeOfArrival, ableToDig);
 	// recreate best path found
-	while(curr != start)
+	while(curr.coords() != start)
 	{
-	    result.push_back(directions[curr]);
-	    curr += getMove(reverseDirection(result.back()));
+	    if(directions.find(curr) == directions.end()) std::cout << "ain't nobody like that here" << std::endl;
+	    else
+	    {
+		std::cout << "( " << directions[curr].first << " | " << directions[curr].second << " )\n";
+	    }
+	    
+	    printVector(curr.toords(), true);
+	    result.push_back(directions[curr].first);
+	    curr.t -= directions[curr].second;
+	    curr.move(reverseDirection(result.back()));
+	    //getchar();
 	}
 
 	std::reverse(result.begin(), result.end());
@@ -482,18 +569,29 @@ std::pair<std::vector<int>, int> Region::findPath(sf::Vector2i start, int time, 
 	for(int i = 0; i < result.size(); ++i)
 	{
 	    // TODO: reserve more! (not reserving the tile you're moving from)
-	    // if walking is possible
-	    if(isReserved(curr, time, time + walkingSpeed).first)
+	    // if it's waiting
+	    if(result[i] == -100)
 	    {
-		reserve(curr, time, time + walkingSpeed);
-		time += walkingSpeed;
-	    }
-	    else // otherwise dig (it has to be a legal move, cause it was checked before)
+		reserve(curr.coords(), time, time+1);
+		time += 1;
+	    } 
+	    else
 	    {
-		reserve(curr, time, time + walkingSpeed + diggingSpeed);
-	        time += walkingSpeed + diggingSpeed;
+		// else if walking is possible
+		if(!isReserved(curr.coords(), time, time + walkingSpeed).first)
+		{
+		    reserve(curr.coords()                     , time, time + walkingSpeed);
+		    reserve(curr.coords() + getMove(result[i]), time, time + walkingSpeed);
+		    time += walkingSpeed;
+		}
+		else // otherwise dig (it has to be a legal move, cause it was checked before)
+		{
+		    reserve(curr.coords()                     , time, time + walkingSpeed + diggingSpeed);
+		    reserve(curr.coords() + getMove(result[i]), time, time + walkingSpeed + diggingSpeed);
+		    time += walkingSpeed + diggingSpeed;
+		}
+		curr.move(result[i]);
 	    }
-	    curr += getMove(result[i]);
 	}
     }
 
@@ -525,7 +623,7 @@ bool Region::inBounds(sf::Vector2i coords)
     return true;
 }
 
-sf::Vector2i Region::getDomainAt(int allegiance, sf::Vector2i coords)
+sf::Vector2i Region::getNestAt(int allegiance, sf::Vector2i coords)
 {
     if(m_nestDomains[allegiance].find(coords) != m_nestDomains[allegiance].end())
     {

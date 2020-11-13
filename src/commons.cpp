@@ -7,11 +7,11 @@
 #include <math.h>
 
 
-int getMoveTotal() {return 4; }
+int getMoveTotal() {return 5; }
 
 sf::Vector2i getMove(int direction)
 {
-    direction = modulo(direction, 4);
+    direction = modulo(direction, 5);
     
     switch(direction)
     {
@@ -19,12 +19,14 @@ sf::Vector2i getMove(int direction)
 	case 1: return sf::Vector2i( 1,  0); break;
 	case 2: return sf::Vector2i( 0,  1); break;
 	case 3: return sf::Vector2i(-1,  0); break;
+	case 4: return sf::Vector2i( 0,  0); break;
     }
 }
 
 int reverseDirection(int direction)
 {
-    return modulo(direction + 2, 4);
+    if(direction == 4) return direction;
+    return modulo(direction - 2, 4);
 }
 
 int modulo(int a, int b)
@@ -159,6 +161,12 @@ std::vector<sf::Color> generatePalette(int colorTotal)
 void printVector(sf::Vector2i a, bool enter)
 {
     std::cout << "{" << a.x << ", " << a.y << "}";
+    if(enter) std::cout << std::endl;
+}
+
+void printVector(sf::Vector3i a, bool enter)
+{
+    std::cout << "{" << a.x << ", " << a.y << ", " << a.z << "}";
     if(enter) std::cout << std::endl;
 }
 

@@ -126,7 +126,7 @@ bool Ant::tick()
     std::cout << "} \n";
     */
     
-    sf::Vector2i nest = m_world->getDomainAt(m_allegiance, m_coords);
+    sf::Vector2i nest = m_world->getNestAt(m_allegiance, m_coords);
 
     // if ant is in a nest, unload
     if(m_coords == nest)
@@ -174,21 +174,28 @@ bool Ant::tick()
 		m_pathRepres.emplace_back((sf::Vector2f(temp) + sf::Vector2f(0.5f, 0.5f)) *
 					  (float)m_aSetts->tileSize, sf::Color::White);
 	    }
-	    
-	    m_direction = m_path[0];
-	    m_representation.setRotation(m_direction * 90.f);
 
-	    // choose action based on next tile 
-	    if     (m_world->isWalkable(m_coords + getMove(m_direction)))
-	    {
-		m_currAction = ActionType::move;
-		m_path.erase(m_path.begin());
-	    }
-	    else if(m_world->isDiggable(m_coords + getMove(m_direction))) m_currAction = ActionType::dig;
-	    else // if you can't, discard the path (attempt to find a new way will be in the next tick)
+	    if(m_path[0] == 4)
 	    {
 		m_currAction = ActionType::wait;
-		m_path.clear();
+	    }
+	    else
+	    {
+		m_direction = m_path[0];
+		m_representation.setRotation(m_direction * 90.f);
+
+		// choose action based on next tile 
+		if     (m_world->isWalkable(m_coords + getMove(m_direction)))
+		{
+		    m_currAction = ActionType::move;
+		    m_path.erase(m_path.begin());
+		}
+		else if(m_world->isDiggable(m_coords + getMove(m_direction))) m_currAction = ActionType::dig;
+		else // if you can't, discard the path (attempt to find a new way will be in the next tick)
+		{
+		    m_currAction = ActionType::wait;
+		    m_path.clear();
+		}
 	    }
 	}
 	else // if no path

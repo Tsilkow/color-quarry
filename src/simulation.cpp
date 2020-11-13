@@ -14,7 +14,7 @@ Simulation::Simulation(std::shared_ptr<RegionSettings>& rSetts, std::shared_ptr<
     m_ants.back().moveTo(sf::Vector2i(0, 0), true);
     m_ants.emplace_back(m_aSetts, m_shr_region, textures, "auntie", 0, AntType::worker, sf::Vector2i(25, 12));
     m_ants.back().moveTo(sf::Vector2i(0, 0), true);
-    m_ants.emplace_back(m_aSetts, m_shr_region, textures, "auntie", 0, AntType::worker, sf::Vector2i(38, 25));
+    m_ants.emplace_back(m_aSetts, m_shr_region, textures, "auntie", 0, AntType::worker, sf::Vector2i(37, 25));
     m_ants.back().moveTo(sf::Vector2i(0, 0), true);
     m_ants.emplace_back(m_aSetts, m_shr_region, textures, "auntie", 0, AntType::worker, sf::Vector2i(25, 37));
     m_ants.back().moveTo(sf::Vector2i(0, 0), true);
