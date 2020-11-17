@@ -38,6 +38,7 @@ int main()
     };
     shared_ptr<RegionSettings> shr_rSetts = make_shared<RegionSettings>(rSetts);
 
+    // TODO: digging/walking ratio must be constant, in order to be able to calculate univesral abstract distances
     AntSettings aSetts =
     {
 	128,

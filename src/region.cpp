@@ -3,9 +3,11 @@
 
 bool Vector2iComparator::operator()(const sf::Vector2i& a, const sf::Vector2i& b)
 {
-    if(a.x < b.x) return true;
-    if(a.x == b.x && a.y < b.y) return true;
-    return false;
+    if(a.x == b.x)
+    {
+	return (a.y < b.y);
+    }
+    else return (a.x < b.x);
 }
 
 bool ReservationComparator::operator()(const Reservation& a, const Reservation& b)
@@ -220,7 +222,7 @@ void Region::generate()
 				case 2: atCoords(m_data, coords).b += m_rSetts->genCenReach-r; break;
 			    }
 			}
-			coords += getMove(i+1) + getMove(i+2);
+			coords += getMove(i-3) + getMove(i-2);
 		    }
 		}
 	    }
@@ -434,31 +436,29 @@ int Region::evalByHeurestic(PathCoord path, sf::Vector2i target)
     return (distance(path.coords() - target) * 256 + path.t);
 }
 
-std::pair<std::vector<int>, int> Region::findPath(sf::Vector2i start, int time, sf::Vector2i target,
-						  int walkingSpeed, int diggingSpeed, int ableToDig)
+std::vector<int> Region::findPath
+(sf::Vector2i start, int time, sf::Vector2i target, int walkingSpeed, int diggingSpeed,
+ int ableToDig, bool isReserving, bool infDigging)
 {
+    return {4};
+    /*
     if(time == -1) time = m_ticks;
     int timeOfArrival;
-    std::vector<int> result;
+    std::vector<int> finalPath;
+    std::vector<sf::Vector3i> digStops;
     std::set<PathCoord, PathCoordHeuresticComparator> potenPaths;
     // map storing best direction from these coords to start
     std::map<PathCoord, std::pair<int, int>, PathCoordComparator> directions; 
+    PathCoord winner(start, time, ableToDig);
     bool stop = false;
-    PathCoord temp(start, time, ableToDig);
-
-    temp.print();
-
-    temp.h = evalByHeurestic(temp, target);
     
-    potenPaths.insert(temp);
-    directions[temp] = std::make_pair(-1, 0);
+    winner.h = evalByHeurestic(winner, target);
+    directions[winner] = std::make_pair(4, 1);
+    potenPaths.insert(winner);
+    
     while(potenPaths.size() > 0)
     {
-	std::cout << potenPaths.size();/* << " = \n{\n";
-	for(auto it = potenPaths.begin(); it != potenPaths.end(); ++it)
-	{
-	    it->print();
-	    }*/
+	std::cout << potenPaths.size();
 	std::cout << "}\n";
 
 	//getchar();
@@ -469,10 +469,10 @@ std::pair<std::vector<int>, int> Region::findPath(sf::Vector2i start, int time, 
 	// check if these coords are available for walking off of them
 	if(!isReserved(curr.coords(), curr.t, walkingSpeed).first)
 	{
-	    for(int i = 0; i < getMoveTotal()-1; ++i) // consider moves without the waiting one
+	    for(int dir = 0; dir < getMoveTotal()-1; ++dir) // consider moves without the waiting one
 	    {
 		// coords which it checks
-		PathCoord next(curr.coords() + getMove(i), curr.t, curr.d);
+		PathCoord next(curr.coords() + getMove(dir), curr.t, curr.d);
 
 		if(inBounds(next.coords()))
 		{
@@ -489,7 +489,7 @@ std::pair<std::vector<int>, int> Region::findPath(sf::Vector2i start, int time, 
 		    if(nextDig.first)
 		    {
 			next.t += walkingSpeed + diggingSpeed;
-			next.d -= nextDig.second;
+			if(!infDigging) next.d -= nextDig.second;
 		    }
 		    else if(nextWalk)
 		    {
@@ -500,20 +500,20 @@ std::pair<std::vector<int>, int> Region::findPath(sf::Vector2i start, int time, 
 
 		    if(directions.find(next) == directions.end() &&
 		       // checks if coords haven't been visited
-		       (nextWalk || (nextDig.first/* && next.d >= 0*/)))
+		       (nextWalk || (nextDig.first && next.d >= 0)))
 		    {
 			// marks which direction it came to these coords
 			std::cout << directions[next].second << std::endl;
 
-			// if it has to dig
-			if(nextDig.first/* && nextDig.second <= next.d*/)
+			// if it has to (and can) dig
+			if(nextDig.first && next.d >= 0)
 			{
-			    directions[next] = std::make_pair(i, walkingSpeed + diggingSpeed);
+			    directions[next] = std::make_pair(dir, walkingSpeed + diggingSpeed);
 			    potenPaths.insert(next);
 			}
 			else // if it can walks here
 			{
-			    directions[next] = std::make_pair(i, walkingSpeed);
+			    directions[next] = std::make_pair(dir, walkingSpeed);
 			    potenPaths.insert(next);
 			}
 
@@ -522,7 +522,8 @@ std::pair<std::vector<int>, int> Region::findPath(sf::Vector2i start, int time, 
 			{
 			    stop = true;
 			    timeOfArrival = next.t;
-			    std::cout << i << std::endl;
+			    winner = next;
+			    std::cout << dir << std::endl;
 			    break;
 			}
 		    }
@@ -547,38 +548,30 @@ std::pair<std::vector<int>, int> Region::findPath(sf::Vector2i start, int time, 
 	if(stop) break;
     }
 
-    //getchar();
+//getchar();
 
-    // if seach found the destination
+// if seach found the destination
     if(stop)
     {
 	PathCoord curr(target, timeOfArrival, ableToDig);
 	// recreate best path found
-	while(curr.coords() != start)
+	while(curr.coords() != target)
 	{
-	    /*
-	    if(directions.find(curr) == directions.end()) std::cout << "ain't nobody like that here" << std::endl;
-	    else
-	    {
-		std::cout << "( " << directions[curr].first << " | " << directions[curr].second << " )\n";
-	    }
-	    
-	    printVector(curr.toords(), true);*/
-	    result.push_back(directions[curr].first);
+	    finalPath.push_back(directions[curr].first);
 	    curr.t -= directions[curr].second;
-	    curr.move(reverseDirection(result.back()));
+	    curr.move(reverseDirection(finalPath.back()));
 	    //getchar();
 	}
 
-	std::reverse(result.begin(), result.end());
+	std::reverse(finalPath.begin(), finalPath.end());
 
 	// calculate time and reserve the coords it was traversing
-	for(int i = 0; i < result.size(); ++i)
+	for(int i = 0; i < finalPath.size(); ++i)
 	{
 	    // if it's waiting
-	    if(result[i] == 4)
+	    if(finalPath[i] == 4)
 	    {
-		reserve(curr.coords(), time, 1);
+		if(isReserving) reserve(curr.coords(), time, 1);
 		time += 1;
 	    } 
 	    else
@@ -586,23 +579,66 @@ std::pair<std::vector<int>, int> Region::findPath(sf::Vector2i start, int time, 
 		// else if walking is possible
 		if(!isReserved(curr.coords(), time, walkingSpeed).first)
 		{
-		    reserve(curr.coords()                     , time, walkingSpeed);
-		    reserve(curr.coords() + getMove(result[i]), time, walkingSpeed);
+		    if(isReserving)
+		    {
+			reserve(curr.coords()                        , time, walkingSpeed);
+			reserve(curr.coords() + getMove(finalPath[i]), time, walkingSpeed);
+		    }
 		    time += walkingSpeed;
 		}
 		else // otherwise dig (it has to be a legal move, cause it was checked before)
 		{
-		    reserve(curr.coords()                     , time, walkingSpeed + diggingSpeed);
-		    reserve(curr.coords() + getMove(result[i]), time, walkingSpeed + diggingSpeed);
+		    if(isReserving)
+		    {
+			reserve(curr.coords()                        , time, walkingSpeed + diggingSpeed);
+			reserve(curr.coords() + getMove(finalPath[i]), time, walkingSpeed + diggingSpeed);
+		    }
+		    digStops.emplace_back(curr.toords());
 		    time += walkingSpeed + diggingSpeed;
 		}
-		curr.move(result[i]);
+		curr.move(finalPath[i]);
 	    }
 	}
     }
 
-    return std::make_pair(result, time);
+    return std::make_tuple(finalPath, time, digStops);*/
 }
+
+/*
+std::pair<std::vector<int>, int> findPath(sf::Vector2i start, int time, std::vector<sf::Vector2i> targets,
+					  int walkingSpeed, int diggingSpeed, int ableToDig, bool 
+    std::pair<std::vector<int>, int> result;
+    
+    for(int i = 0; i < targets.size(); ++i)
+    {
+	sf::Vector2i beginning;
+	if(i == 0) beginning = start;
+	else beginning = targets[i-1];
+	
+	auto temp = findPath(beginning, time, targets[i], walkingSpeed,
+							 diggingSpeed, ableToDig, reserve);
+
+	result.first.insert(result.end(), temp.begin(), temp.end());
+	result.second += temp.second;
+    }
+
+    return result;
+}
+
+std::pair<std::vector<int>, int> findDiggingPath(sf::Vector2i start, int time, sf::Vector2i target,
+						 int walkingSpeed, int diggingSpeed, int ableToDig)
+{
+    std::pair<std::vector<int>, int> result;
+    auto diggingPath = findPath(start, time, target, walkingSpeed, diggingSpeed, ableToDig, false, true);
+    sf::Vector2i waypoint; // coords to which ant can dig to on these settings without unloading
+    int rubbleSoFar = 0;
+
+    for(int i = 0; i < diggingPath.first.size(); ++i)
+    {
+	
+    }
+}
+*/
 
 bool Region::tick(int ticksPassed)
 {

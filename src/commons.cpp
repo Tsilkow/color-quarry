@@ -11,15 +11,15 @@ int getMoveTotal() {return 5; }
 
 sf::Vector2i getMove(int direction)
 {
-    direction = modulo(direction, 5);
+    if(direction != 4) direction = modulo(direction, 4);
     
     switch(direction)
     {
-	case 0: return sf::Vector2i( 0, -1); break;
-	case 1: return sf::Vector2i( 1,  0); break;
-	case 2: return sf::Vector2i( 0,  1); break;
-	case 3: return sf::Vector2i(-1,  0); break;
-	case 4: return sf::Vector2i( 0,  0); break;
+	case 0: return sf::Vector2i( 0, -1); break; // north
+	case 1: return sf::Vector2i( 1,  0); break; // east
+	case 2: return sf::Vector2i( 0,  1); break; // south
+	case 3: return sf::Vector2i(-1,  0); break; // west
+	case 4: return sf::Vector2i( 0,  0); break; // wait
     }
 }
 

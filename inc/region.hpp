@@ -29,12 +29,18 @@ struct RegionSettings
 
 enum TileType {open=0, wall=1, nest=2};
 
+struct Vector2iComparator
+{
+    bool operator()(const sf::Vector2i& a, const sf::Vector2i& b);
+};
+
 struct Tile
 {
     TileType type;
     int r;
     int g;
     int b;
+    std::map<sf::Vector2i, int, Vector2iComparator> naiveDistanceFrom; // naive distance means a distance assuming no other agents are in the way
 };
 
 struct Reservation
@@ -94,11 +100,6 @@ struct PathCoordHeuresticComparator
     bool operator() (const PathCoord& a, const PathCoord& b);
 };
 
-struct Vector2iComparator
-{
-    bool operator()(const sf::Vector2i& a, const sf::Vector2i& b);
-};
-
 struct ReservationComparator
 {
     bool operator()(const Reservation& a, const Reservation& b);
@@ -142,8 +143,13 @@ class Region
 
     std::vector<int> digOut(sf::Vector2i coords, int amount);
 
-    std::pair<std::vector<int>, int> findPath(sf::Vector2i start, int time, sf::Vector2i target,
-					      int walkingSpeed, int diggingSpeed, int ableToDig);
+    std::vector<int> findPath
+    (sf::Vector2i start, int time, sf::Vector2i target, int walkingSpeed, int diggingSpeed, int ableToDig,
+     bool isReserving = true, bool infDigging = false);
+    
+    /*std::pair<std::vector<int>, int> findPath
+    (sf::Vector2i start, int time, std::vector<sf::Vector2i> target, int walkingSpeed, int diggingSpeed,
+    int ableToDig, bool reserve = true);*/
     
     bool tick(int ticksPassed);
 

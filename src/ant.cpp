@@ -105,7 +105,7 @@ bool Ant::moveTo(sf::Vector2i target, bool dig)
     if(dig) toDig = 0;
 
     std::vector<int> temp = m_world->findPath(m_coords, -1, target, m_aSetts->walkingSpeed,
-					      m_aSetts->diggingSpeed, toDig).first;
+					      m_aSetts->diggingSpeed, toDig);
 
     if(temp.size() > 0)
     {
